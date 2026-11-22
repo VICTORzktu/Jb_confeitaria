@@ -3,10 +3,9 @@
   "version": 2,
   "functions": {
     "server/vercel.js": {
-      "includeFiles": "{public/**,server/**,package.json}"
+      "includeFiles": "{public/**,server/**,package.json}",
+      "memory": 1024,
+      "maxDuration": 30
     }
-  },
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/server/vercel.js" }
-  ]
+  }
 }
