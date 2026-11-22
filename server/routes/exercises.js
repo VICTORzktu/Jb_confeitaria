@@ -72,8 +72,9 @@ router.get('/', requireAuth, async (req, res) => {
     facets.modalities = (await db.prepare('SELECT slug, name FROM modalities WHERE is_active = 1 ORDER BY name').all())
       .map((m) => ({ slug: m.slug, name: m.name, count: counts.get(m.slug) || 0 }));
   }
-  // total sem paginação (para o resumo "65 de 65")
-  const totalAll = (await db.prepare(`SELECT COUNT(*) c FROM exercises WHERE ${main.sql}`).get(...main.params)).c;
+  // Total de exercícios ativos na biblioteca (número fixo, exibido no chip "Todos").
+  // As demais opções de filtro usam contagem global, então "Todos" também precisa ser global.
+  const totalAll = (await db.prepare('SELECT COUNT(*) c FROM exercises WHERE is_active = 1').get()).c;
 
   res.json({
     exercises: rows.map((r) => shape(r, plan)),
