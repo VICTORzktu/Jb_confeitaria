@@ -3,11 +3,7 @@
   "version": 2,
   "functions": {
     "server/vercel.js": {
-      "includeFiles": [
-        "public/**",
-        "server/**",
-        "package.json"
-      ]
+      "includeFiles": "{public/**,server/**,package.json}"
     }
   },
   "rewrites": [
