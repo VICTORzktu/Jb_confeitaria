@@ -1,0 +1,30 @@
+{
+  "name": "fitai",
+  "version": "1.0.0",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "seed": "node -e \"require('./server/seed').runSeed()\"",
+    "test": "node tests/smoke.js",
+    "test:ai": "node tests/ai-flow.js",
+    "mock:ai": "node tests/mock-ai-server.js"
+  },
+  "description": "FitAI — plataforma inteligente de treinos com IA",
+  "dependencies": {
+    "@fontsource-variable/space-grotesk": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "acorn": "^8.19.0",
+    "acorn-walk": "^8.3.5",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.11.1",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.1",
+    "qrcode": "^1.5.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,20 @@
+# Dependências
+node_modules/
+
+# Banco local (SQLite) e segredos
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.local
+
+# Uploads e artefatos de teste
+uploads/
+.shots/
+telas/
+telas-fitai.html
+
+# Logs e temporários
+*.log
+.DS_Store
