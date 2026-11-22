@@ -231,13 +231,31 @@ async function renderLibrary(root) {
     return arr;
   }
 
+  // Mensagem de vazio que cita exatamente o que está filtrando — evita o usuário
+  // achar que a biblioteca "sumiu" quando a busca e um filtro se contradizem.
+  function emptyHint() {
+    const parts = [];
+    if (filters.q) parts.push(`a busca “${esc(filters.q)}”`);
+    if (filters.muscle) parts.push(`o músculo ${esc(filters.muscle)}`);
+    if (filters.equipment) parts.push(`o equipamento ${esc(filters.equipment)}`);
+    if (filters.difficulty) parts.push(`o nível ${esc(filters.difficulty)}`);
+    if (filters.modality) {
+      const m = state.data?.facets?.modalities?.find((x) => x.slug === filters.modality);
+      parts.push(`a modalidade ${esc(m ? m.name : filters.modality)}`);
+    }
+    if (!parts.length) return 'A biblioteca não retornou resultados. Tente novamente.';
+    if (parts.length === 1) return `Nenhum resultado para ${parts[0]}.`;
+    const last = parts.pop();
+    return `Nenhum resultado para ${parts.join(', ')} e ${last}.`;
+  }
+
   function renderResults(data) {
     const box = document.getElementById('lib-results');
     if (!data.exercises.length) {
       box.innerHTML = `<div class="empty">
         <div class="empty-icon">${icon('search')}</div>
         <h4>Nenhum exercício encontrado</h4>
-        <p>${filters.q ? `Nada corresponde a “${esc(filters.q)}”.` : 'Tente remover algum filtro.'}</p>
+        <p>${emptyHint()}</p>
         <button class="btn btn-ghost btn-sm" id="lib-empty-reset">Limpar filtros</button>
       </div>`;
       const b = document.getElementById('lib-empty-reset'); if (b) b.onclick = resetAll;
