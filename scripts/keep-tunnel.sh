@@ -34,16 +34,33 @@ while true; do
       NEW=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/cloudflared-out.log 2>/dev/null | head -1)
       [ -n "$NEW" ] && break
     done
-    if [ -n "$NEW" ]; then echo "$NEW" > "$URLFILE"; log "NOVO ENDEREÇO: $NEW"; fi
+    if [ -n "$NEW" ]; then
+      # espera o DNS/edge do Cloudflare começar a responder antes de publicar o endereço
+      OK=0
+      for j in $(seq 1 18); do
+        C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$NEW/api/public/health" 2>/dev/null)
+        [ "$C" = "200" ] && { OK=1; break; }
+        sleep 8
+      done
+      if [ "$OK" = "1" ]; then echo "$NEW" > "$URLFILE"; log "NOVO ENDEREÇO (ativo): $NEW"
+      else log "endereço $NEW não respondeu — tentará de novo no próximo ciclo"; fi
+    fi
   fi
   URL=$(cat "$URLFILE" 2>/dev/null || true)
   if [ -n "$URL" ]; then
     CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 "$URL/api/public/health" 2>/dev/null || echo 000)
     log "checagem → $CODE ($URL)"
     if [ "$CODE" != "200" ]; then
-      log "sem resposta — reciclando túnel"
-      pkill -f "cloudflared tunnel --url" 2>/dev/null
-      sleep 3
+      FAILS=$(( ${FAILS:-0} + 1 ))
+      log "sem resposta ($FAILS/2)"
+      if [ "$FAILS" -ge 2 ]; then
+        log "duas falhas seguidas — reciclando túnel"
+        pkill -f "cloudflared tunnel --url" 2>/dev/null
+        FAILS=0
+        sleep 5
+      fi
+    else
+      FAILS=0
     fi
   fi
   sleep 60
