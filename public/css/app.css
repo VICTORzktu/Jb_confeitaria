@@ -299,8 +299,30 @@
   .profile-layout, .chat-layout { grid-template-columns: 1fr; }
   .chat-layout { height: auto; }
   .chat-panel { height: 70svh; }
-  .chat-side { flex-direction: row; flex-wrap: wrap; }
-  .chat-side > * { flex: 1 1 220px; }
+  /* O painel de contexto NÃO pode virar linha espremida: em telas estreitas
+     os cards ficam lado a lado numa faixa que rola na horizontal, e os textos
+     de apoio (que só decoram) são escondidos. Antes, o painel do chat subia
+     por cima dele e o conteúdo aparecia cortado. */
+  .chat-side {
+    flex-direction: row; flex-wrap: nowrap; align-items: stretch;
+    overflow-x: auto; overflow-y: hidden;
+    gap: 10px; padding-bottom: 2px; scrollbar-width: none;
+    max-height: 108px;
+  }
+  .chat-side::-webkit-scrollbar { display: none; }
+  .chat-side > * { flex: 0 0 auto; max-width: 240px; }
+  .chat-side .alert { display: none; }
+  .chat-side .card p { display: none; }
+  .chat-side .card-tight { padding: 10px 14px; display: flex; flex-direction: column; justify-content: center; }
+  .chat-side .card-tight .row { margin: 0; gap: 9px; }
+  .chat-side .card-tight .fs11.dim { display: none; }
+  /* sugestões: viram chips numa única linha horizontal (não empilham) */
+  .chat-side > .card:nth-of-type(2) > div { flex-direction: row !important; flex-wrap: nowrap !important; gap: 8px !important; overflow-x: auto; scrollbar-width: none; }
+  .chat-side > .card:nth-of-type(2) > div::-webkit-scrollbar { display: none; }
+  .chat-side .suggest-q {
+    white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis;
+    flex: 0 0 auto; font-size: 12px; padding: 7px 12px;
+  }
   .admin-layout { grid-template-columns: 1fr; }
   /* menu do admin no celular: quebra em linhas e nunca alarga a página */
   .admin-nav { position: static; flex-direction: row; flex-wrap: wrap; min-width: 0; width: 100%; }
@@ -321,7 +343,11 @@
   .topbar .actions .btn { height: 32px; padding: 0 11px; font-size: 12px; }
   .topbar .actions a.icon-btn[href="/personal-ia"] { display: none; }
   /* chat em tela pequena: altura da viewport, sem rolagem da página inteira */
-  .chat-layout { height: calc(100svh - 60px - 96px); min-height: 380px; gap: 12px; }
+  /* desconta topbar (60) + respiro + faixa do painel de contexto, para o
+     chat inteiro caber na tela sem empurrar o rodapé */
+  .chat-layout { height: calc(100svh - 60px - 92px); min-height: 420px; gap: 10px;
+    grid-template-rows: auto minmax(0, 1fr); }
+  .chat-panel { height: auto; }
   .chat-input { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
   .chat-input textarea { font-size: 16px; } /* 16px evita zoom automático do iOS */
   .chat-messages { padding: 14px; }
