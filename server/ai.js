@@ -50,20 +50,30 @@ async function chat({ messages, json = false, maxTokens = 4096, timeoutMs = 9000
   if (!isConfigured(cfg)) {
     throw new AIError('A integração com IA ainda não foi configurada. Um administrador precisa informar o provedor e a chave de API no Painel Admin > Integração com IA.');
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    // Gateway/proxy reverso (ex.: plataformas que expõem uma URL compatível com OpenAI)
-    if (cfg.proxyUrl) return await callOpenAICompatible({ ...cfg, baseUrl: cfg.proxyUrl, apiKey: cfg.proxyToken || cfg.apiKey }, messages, { json, maxTokens, signal: controller.signal });
-    if (cfg.provider === 'anthropic') return await callAnthropic(cfg, messages, { json, maxTokens, signal: controller.signal });
-    if (cfg.provider === 'gemini') return await callGemini(cfg, messages, { json, maxTokens, signal: controller.signal });
-    return await callOpenAICompatible(cfg, messages, { json, maxTokens, signal: controller.signal });
-  } catch (e) {
-    if (e.name === 'AbortError') throw new AIError('A IA demorou demais para responder. Tente novamente.');
-    throw e;
-  } finally {
-    clearTimeout(timer);
+  // Lista de modelos a tentar: o configurado primeiro, depois os alternativos do provedor.
+  const alternatives = (MODEL_FALLBACKS[cfg.provider] || []).filter((m) => m !== cfg.model);
+  const modelsToTry = [cfg.model, ...alternatives];
+
+  let lastError = null;
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      // Gateway/proxy reverso (ex.: plataformas que expõem uma URL compatível com OpenAI)
+      if (cfg.proxyUrl) return await callOpenAICompatible({ ...cfg, baseUrl: cfg.proxyUrl, apiKey: cfg.proxyToken || cfg.apiKey }, messages, { json, maxTokens, signal: controller.signal });
+      if (cfg.provider === 'anthropic') return await callAnthropic(cfg, messages, { json, maxTokens, signal: controller.signal });
+      if (cfg.provider === 'gemini') return await callGemini({ ...cfg, model: modelsToTry[i] }, messages, { json, maxTokens, signal: controller.signal });
+      return await callOpenAICompatible(cfg, messages, { json, maxTokens, signal: controller.signal });
+    } catch (e) {
+      lastError = e.name === 'AbortError' ? new AIError('A IA demorou demais para responder. Tente novamente.') : e;
+      // Só tenta o próximo modelo em falhas passageiras (sobrecarga/indisponibilidade).
+      const hasNext = i < modelsToTry.length - 1;
+      if (!hasNext || !isTransientAIError(lastError)) throw lastError;
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  throw lastError || new AIError('Falha ao consultar a IA.');
 }
 
 async function callOpenAICompatible(cfg, messages, { json, maxTokens, signal }) {
@@ -117,6 +127,23 @@ async function callAnthropic(cfg, messages, { json, maxTokens, signal }) {
   });
 }
 
+// Gemini 2.5+ e 3.x aceitam thinkingConfig; modelos antigos (1.5) rejeitam o campo.
+function supportsThinkingBudget(model) {
+  const m = String(model || '').toLowerCase();
+  return /^gemini-(2\.5|3|omni|flash-latest)/.test(m) || /^gemini-(2\.5|3)/.test(m);
+}
+
+/* Modelos alternativos: quando o modelo escolhido está sobrecarregado (erro 503
+   UNAVAILABLE do Google), a IA tenta um vizinho mais leve em vez de falhar. */
+const MODEL_FALLBACKS = {
+  gemini: ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash'],
+};
+
+function isTransientAIError(err) {
+  const m = String(err?.message || '');
+  return /high demand|overloaded|unavailable|temporarily|capacity|503|502|504|timeout|aborted/i.test(m);
+}
+
 async function callGemini(cfg, messages, { json, maxTokens, signal }) {
   const sys = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
   const contents = messages.filter((m) => m.role !== 'system').map((m) => ({
@@ -134,13 +161,24 @@ async function callGemini(cfg, messages, { json, maxTokens, signal }) {
         temperature: cfg.temperature,
         maxOutputTokens: maxTokens,
         ...(json ? { responseMimeType: 'application/json' } : {}),
+        // Modelos "thinking" (Gemini 2.5+/3.x) gastam centenas de tokens de raciocínio
+        // interno antes de responder — com maxOutputTokens de 1200 a resposta saía
+        // truncada ou vazia (finishReason MAX_TOKENS). Desligamos o raciocínio:
+        // as respostas do FitAI são curtas e o custo/latência cairiam muito.
+        ...(supportsThinkingBudget(cfg.model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
       },
     }),
   });
   return parseResponse(res, async (d) => {
     const cand = d.candidates && d.candidates[0];
     const text = cand?.content?.parts?.map((p) => p.text).filter(Boolean).join('\n');
-    if (!text) throw new AIError('Resposta vazia da IA (pode ter sido bloqueada por segurança).');
+    if (!text) {
+      // MAX_TOKENS sem texto = todo o orçamento foi consumido por raciocínio interno
+      if (cand?.finishReason === 'MAX_TOKENS') {
+        throw new AIError('A IA atingiu o limite de tamanho antes de responder. Tente novamente com uma pergunta mais curta.');
+      }
+      throw new AIError('A resposta da IA foi bloqueada por segurança. Reformule a pergunta.');
+    }
     return text;
   });
 }

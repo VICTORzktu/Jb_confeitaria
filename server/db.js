@@ -218,7 +218,20 @@ const db = {
     };
   },
   async exec(sql) { return sqlite.exec(sql); },
-  async transaction(fn) { return sqlite.transaction(fn)(); }, // recebe fn e executa (mesma assinatura do driver pg)
+  // better-sqlite3 NÃO aceita função async dentro de .transaction() — ele exige
+  // execução síncrona e aborta com "Transaction function cannot return a promise".
+  // Como a interface acima é assíncrona, emulamos a transação com BEGIN/COMMIT.
+  async transaction(fn) {
+    sqlite.exec('BEGIN');
+    try {
+      const result = await fn();
+      sqlite.exec('COMMIT');
+      return result;
+    } catch (e) {
+      try { sqlite.exec('ROLLBACK'); } catch { /* transação já encerrada */ }
+      throw e;
+    }
+  },
   pragma(...args) { return sqlite.pragma(...args); },
   async close() { return sqlite.close(); },
   raw: sqlite,

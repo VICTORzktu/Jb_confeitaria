@@ -186,6 +186,9 @@
 
 /* Chat */
 .chat-layout { display: grid; grid-template-columns: 280px 1fr; gap: 18px; height: calc(100svh - var(--topbar-h) - 110px); min-height: 520px; }
+/* o painel do chat não pode crescer com as mensagens: quem rola é .chat-messages */
+.chat-layout > *, .chat-panel > * { min-height: 0; }
+.chat-messages { overflow-y: auto; overscroll-behavior: contain; }
 .chat-side { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
 .suggest-q { text-align: left; border: 1px solid var(--border); border-radius: 11px; padding: 11px 13px; font-size: 12.5px; color: var(--text-2); background: var(--surface); transition: .16s; line-height: 1.45; }
 .suggest-q:hover { border-color: rgba(198, 244, 50, .3); color: var(--text); }
@@ -216,7 +219,13 @@
 .typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
 @keyframes blink { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 .chat-input { border-top: 1px solid var(--border); padding: 12px 14px; display: flex; gap: 10px; align-items: flex-end; background: var(--surface-2); }
-.chat-input textarea { flex: 1; min-height: 44px; max-height: 140px; padding: 12px 14px; border-radius: 13px; border: 1px solid var(--border-strong); background: var(--bg-soft); resize: none; font-size: 13.5px; line-height: 1.45; }
+.chat-input textarea {
+  flex: 1; min-height: 44px; max-height: 140px; padding: 11px 14px;
+  border-radius: 13px; border: 1px solid var(--border-strong); background: var(--bg-soft);
+  resize: none; font-size: 13.5px; line-height: 1.45;
+  overflow-y: hidden; /* cresce pelo JS; sem barra interna enquanto é 1 linha */
+}
+.chat-input textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chat-input textarea:focus { outline: none; border-color: var(--lime); }
 .chat-send { width: 44px; height: 44px; border-radius: 13px; background: var(--lime); color: #0a1007; display: grid; place-items: center; flex: none; transition: .16s; }
 .chat-send:hover { background: #d4ff55; }
@@ -262,7 +271,7 @@
 
 /* Admin */
 .admin-layout { display: grid; grid-template-columns: 215px 1fr; gap: 20px; align-items: start; }
-.admin-nav { display: flex; flex-direction: column; gap: 3px; position: sticky; top: calc(var(--topbar-h) + 18px); }
+.admin-nav { display: flex; flex-direction: column; gap: 3px; position: sticky; top: calc(var(--topbar-h) + 18px); min-width: 0; }
 .admin-nav button { text-align: left; padding: 10px 13px; border-radius: 9px; font-size: 13.5px; color: var(--text-2); display: flex; gap: 10px; align-items: center; transition: .15s; }
 .admin-nav button svg { width: 16px; height: 16px; }
 .admin-nav button:hover { background: rgba(255, 255, 255, .04); color: var(--text); }
@@ -293,7 +302,10 @@
   .chat-side { flex-direction: row; flex-wrap: wrap; }
   .chat-side > * { flex: 1 1 220px; }
   .admin-layout { grid-template-columns: 1fr; }
-  .admin-nav { position: static; flex-direction: row; flex-wrap: wrap; }
+  /* menu do admin no celular: quebra em linhas e nunca alarga a página */
+  .admin-nav { position: static; flex-direction: row; flex-wrap: wrap; min-width: 0; width: 100%; }
+  .admin-nav button { flex: 0 1 auto; min-width: 0; max-width: 100%; font-size: 12.5px; padding: 9px 11px; }
+  .admin-nav button span, .admin-nav button { overflow-wrap: anywhere; }
 }
 @media (max-width: 900px) {
   .sidebar { transform: translateX(-100%); box-shadow: none; }
@@ -304,10 +316,24 @@
   .topbar { padding: 0 14px; gap: 8px; height: 60px; }
   .topbar h1 { font-size: 15.5px; }
   .topbar .crumb { display: none; }
-  .topbar .actions { gap: 6px; flex: none; }
+  .topbar .actions { gap: 6px; flex: none; min-width: 0; }
+  .topbar .actions .badge { max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .topbar .actions .btn { height: 32px; padding: 0 11px; font-size: 12px; }
   .topbar .actions a.icon-btn[href="/personal-ia"] { display: none; }
+  /* chat em tela pequena: altura da viewport, sem rolagem da página inteira */
+  .chat-layout { height: calc(100svh - 60px - 96px); min-height: 380px; gap: 12px; }
+  .chat-input { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  .chat-input textarea { font-size: 16px; } /* 16px evita zoom automático do iOS */
+  .chat-messages { padding: 14px; }
   .app-content [style*="grid-template-columns:repeat(4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  /* qualquer grid de 2 colunas inline vira 1 coluna no celular (forms do admin etc.) */
+  .app-content [style*="grid-template-columns:1fr 1fr"],
+  .app-content [style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+  .grid.g2 { grid-template-columns: 1fr !important; }
+  /* linhas de botões lado a lado passam a empilhar quando faltar espaço */
+  .row.wrap .btn, .app-content .row > .btn { min-width: 0; }
+  .app-content .row .btn.grow { flex-basis: 100%; }
+  .app-content .card, .app-content .panel { min-width: 0; }
   .app-content { padding: 18px 16px 50px; }
   .week-grid { gap: 5px; }
   .day-cell { min-height: 78px; padding: 8px 5px; }

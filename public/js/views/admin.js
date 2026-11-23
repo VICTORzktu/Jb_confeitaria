@@ -449,7 +449,7 @@ async function renderAdmin(root) {
             <input class="input" type="password" id="ai-proxy-token" placeholder="${c.has_proxy_token ? 'Deixe em branco para manter' : 'opcional'}"></div>
           <div class="field mt2"><label>Temperatura: <span id="temp-val" class="lime">${c.temperature}</span></label>
             <input type="range" id="ai-temp" min="0" max="1.2" step="0.1" value="${c.temperature}"></div>
-          <div class="row mt3" style="gap:8px">
+          <div class="row mt3 wrap" style="gap:8px">
             <button class="btn btn-primary grow" id="save-ai">${icon('check')} Salvar configuração</button>
             <button class="btn btn-dark" id="test-ai">${icon('zap')} Testar conexão</button>
           </div>

@@ -87,7 +87,7 @@ async function renderChat(root) {
         </div>
         <div class="chat-messages" id="chat-messages"></div>
         <div class="chat-input">
-          <textarea id="chat-text" rows="1" placeholder="Pergunte sobre treino, execução, substituições, descanso..."></textarea>
+          <textarea id="chat-text" rows="1" placeholder="Pergunte sobre treino, execução, descanso..."></textarea>
           <button class="chat-send" id="chat-send" aria-label="Enviar">${icon('send')}</button>
         </div>
       </section>
@@ -130,6 +130,30 @@ async function renderChat(root) {
     el.className = 'badge badge-sm' + (q.remaining <= 3 ? ' badge-orange' : '');
   }
 
+  // Converte falhas do provedor de IA em mensagens úteis em português.
+  function friendlyAIError(e) {
+    const raw = String(e?.message || '');
+    if (/high demand|overloaded|unavailable|capacity|temporarily/i.test(raw)) {
+      return 'O modelo de IA está com alta demanda neste momento (isso costuma ser passageiro).\n\n**Tente enviar novamente em instantes** — se persistir, avise um administrador para trocar o modelo em Painel Admin › Integração com IA.';
+    }
+    if (/limite de uso|quota|rate limit|429/i.test(raw)) {
+      return 'O limite de uso do provedor de IA foi atingido. Aguarde um minuto e tente novamente.';
+    }
+    if (/limite de tamanho|max_tokens|limite de tamanho antes de responder/i.test(raw)) {
+      return 'A resposta ficou longa demais para o limite configurado. Tente uma pergunta mais curta.';
+    }
+    if (/chave|api key|unauthorized|401|403|invalid.*key/i.test(raw)) {
+      return 'A chave de API da IA parece inválida ou expirada. Um administrador precisa atualizá-la em Painel Admin › Integração com IA.';
+    }
+    if (/não está configurado|não foi configurada|AI_NOT_CONFIGURED/i.test(raw)) {
+      return 'O Personal IA ainda não foi configurado. Um administrador precisa informar provedor e chave em Painel Admin › Integração com IA.';
+    }
+    if (/segurança|safety|bloque/i.test(raw)) {
+      return 'A resposta foi bloqueada pelo filtro de segurança do provedor. Tente reformular a pergunta.';
+    }
+    return 'Desculpe, não consegui responder agora.\n\n' + (raw || 'Tente novamente em instantes.');
+  }
+
   async function send(text) {
     const message = (text ?? ta.value).trim();
     if (!message || sending) return;
@@ -149,8 +173,10 @@ async function renderChat(root) {
       if (e.code === 'QUOTA_EXCEEDED' || e.code === 'UPGRADE_REQUIRED') {
         addMsg('assistant', e.message + '\n\nFaça upgrade em **Planos** para continuar conversando.');
       } else {
-        addMsg('assistant', 'Desculpe, tive um problema para responder agora.\n\n' + e.message);
-        toast(e.message, 'error');
+        // erros do provedor vêm em inglês e com jargão técnico — traduz e orienta
+        const msg = friendlyAIError(e);
+        addMsg('assistant', msg);
+        toast(msg.split('\n')[0], 'error');
       }
     } finally {
       sending = false;
