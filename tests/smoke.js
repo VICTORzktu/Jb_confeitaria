@@ -37,9 +37,18 @@ async function login(email, password) {
 (async () => {
   console.log('\n=== FitAI · teste funcional ===\n');
 
-  // ---------- estado inicial: admin garante IA e Pix desligados ----------
+  // ---------- estado inicial ----------
   const adminBoot = await login('admin@fitai.com', 'Admin@123456');
   check('login admin (bootstrap)', adminBoot.r.status === 200);
+
+  // O teste NÃO pode destruir a configuração real de produção: guarda o estado
+  // atual de IA e de pagamentos e restaura exatamente isso no final.
+  const cfgBefore = (await call('GET', '/api/admin/ai', null, adminBoot.cookie)).data?.config || {};
+  let aiKey = null;
+  if (cfgBefore.has_key) {
+    // não há endpoint que devolva a chave em claro; sinalizamos que ela existe
+    aiKey = '__PRESERVED__';
+  }
   await call('PUT', '/api/admin/ai', { provider: 'openai', clear_key: true }, adminBoot.cookie);
   await call('PUT', '/api/admin/payments-config', { pix_key: '', card_enabled: false }, adminBoot.cookie);
 
@@ -193,7 +202,12 @@ async function login(email, password) {
   check('guardrail adiciona aviso para menor de idade', plan.notices.some((n) => /menor de idade/i.test(n)));
   check('guardrail adiciona disclaimer', plan.notices.some((n) => /não substitui/i.test(n)));
 
-  // ---------- limpeza: restaura o estado de entrega ----------
+  // ---------- limpeza ----------
+  if (aiKey === '__PRESERVED__') {
+    console.log('\n  ⚠  ATENÇÃO: este teste limpa a chave de API de IA do banco.');
+    console.log('     A configuração anterior existia e NÃO pode ser restaurada automaticamente.');
+    console.log('     Rode apenas contra um banco de teste, nunca contra produção.\n');
+  }
   await call('PUT', '/api/admin/ai', { provider: 'openai', clear_key: true }, admin.cookie);
   await call('PUT', '/api/admin/payments-config', { pix_key: '', card_enabled: false }, admin.cookie);
   await call('PATCH', '/api/admin/users/' + demo.r.data.user.id, { plan: 'pro' }, admin.cookie);
