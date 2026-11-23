@@ -127,10 +127,12 @@ async function callAnthropic(cfg, messages, { json, maxTokens, signal }) {
   });
 }
 
-// Gemini 2.5+ e 3.x aceitam thinkingConfig; modelos antigos (1.5) rejeitam o campo.
+// Só os modelos Gemini aceitam thinkingConfig (e não todos: variantes "lite" recusam).
 function supportsThinkingBudget(model) {
   const m = String(model || '').toLowerCase();
-  return /^gemini-(2\.5|3|omni|flash-latest)/.test(m) || /^gemini-(2\.5|3)/.test(m);
+  if (!/^gemini-/.test(m)) return false;
+  if (/lite|image|tts/.test(m)) return false;
+  return /^gemini-(2\.5|3|omni|flash-latest)/.test(m);
 }
 
 /* Modelos alternativos: quando o modelo escolhido está sobrecarregado (erro 503
@@ -141,6 +143,8 @@ const MODEL_FALLBACKS = {
 
 function isTransientAIError(err) {
   const m = String(err?.message || '');
+  // Cota esgotada não melhora trocando de modelo — aborta na hora com mensagem clara.
+  if (/quota|RESOURCE_EXHAUSTED|billing|exceeded your current quota/i.test(m)) return false;
   return /high demand|overloaded|unavailable|temporarily|capacity|503|502|504|timeout|aborted/i.test(m);
 }
 
@@ -193,7 +197,18 @@ async function parseResponse(res, extract) {
       msg = j.error?.message || j.error?.[0]?.message || j.message || msg;
     } catch { if (text) msg += `: ${text.slice(0, 200)}`; }
     if (res.status === 401 || res.status === 403) msg = 'Chave de API inválida ou sem permissão. Verifique a configuração no Painel Admin.';
-    if (res.status === 429) msg = 'Limite de uso do provedor de IA atingido. Aguarde um pouco e tente novamente.';
+    if (res.status === 429) {
+      // 429 do Google pode ser cota diária do plano gratuito (só volta no dia seguinte)
+      // ou apenas limite por minuto. A mensagem precisa diferenciar as duas.
+      const daily = /per day|free_tier_requests|daily/i.test(text);
+      const wait = /retry in ([^.]*)/i.exec(text)?.[1];
+      msg = daily
+        ? 'A cota diária gratuita do provedor de IA terminou' + (wait ? ` e renova em ${wait.trim()}` : '') + '. Um administrador pode usar outra chave ou ativar o faturamento do provedor em Painel Admin › Integração com IA.'
+        : 'Limite de uso do provedor de IA atingido. Aguarde um minuto e tente novamente.';
+      const err = new AIError(msg);
+      err.code = daily ? 'AI_QUOTA_DAILY' : 'AI_RATE_LIMIT';
+      throw err;
+    }
     throw new AIError(msg);
   }
   let data;

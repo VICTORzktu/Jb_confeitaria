@@ -58,7 +58,7 @@ router.post('/', requireAuth, rateLimit({ windowMs: 60000, max: 15 }), async (re
   } catch (e) {
     // remove a mensagem do usuário se a IA falhou, para permitir reenviar
     await db.prepare("DELETE FROM chat_messages WHERE id = (SELECT id FROM chat_messages WHERE user_id = ? ORDER BY id DESC LIMIT 1)").run(req.user.id);
-    if (e instanceof AIError) return res.status(502).json({ error: e.message, code: 'AI_ERROR' });
+    if (e instanceof AIError) return res.status(502).json({ error: e.message, code: e.code || 'AI_ERROR' });
     return res.status(500).json({ error: 'Falha ao consultar o Personal IA.' });
   }
 });

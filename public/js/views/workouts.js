@@ -394,6 +394,16 @@ async function renderWorkouts(root) {
           m.querySelector('[data-close]').disabled = false;
           if (e.code === 'QUOTA_EXCEEDED') { closeModal(); upgradeModal('Gerações de treino'); return; }
           if (e.code === 'AI_NOT_CONFIGURED') { closeModal(); aiNotConfiguredModal(); return; }
+          // cota da IA esgotada no provedor: aviso longo e explícito, não um toast curto
+          if (e.code === 'AI_QUOTA_DAILY') {
+            setLoading(btn, false);
+            m.querySelector('.modal-actions')?.insertAdjacentHTML('beforeend', '');
+            const box = document.createElement('div');
+            box.className = 'alert alert-danger mt2';
+            box.innerHTML = `${icon('alert')}<div><strong>Serviço de IA temporariamente indisponível.</strong><br>${esc(e.message)}</div>`;
+            m.appendChild(box);
+            return;
+          }
           toast(e.message, 'error', 8000);
         }
       };

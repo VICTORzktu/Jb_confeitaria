@@ -133,6 +133,10 @@ async function renderChat(root) {
   // Converte falhas do provedor de IA em mensagens úteis em português.
   function friendlyAIError(e) {
     const raw = String(e?.message || '');
+    // cota diária esgotada: a mensagem do servidor já é clara e não deve ser reescrita
+    if (e?.code === 'AI_QUOTA_DAILY') {
+      return raw + '\n\nEnquanto isso você pode usar seus treinos normalmente — a biblioteca, o registro de sessões e o progresso não dependem da IA.';
+    }
     if (/high demand|overloaded|unavailable|capacity|temporarily/i.test(raw)) {
       return 'O modelo de IA está com alta demanda neste momento (isso costuma ser passageiro).\n\n**Tente enviar novamente em instantes** — se persistir, avise um administrador para trocar o modelo em Painel Admin › Integração com IA.';
     }

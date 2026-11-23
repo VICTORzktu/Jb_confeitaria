@@ -104,7 +104,7 @@ router.post('/generate', requireAuth, rateLimit({ windowMs: 60000, max: 6 }), as
       message: 'Treino gerado com sucesso.',
     });
   } catch (e) {
-    if (e instanceof AIError) return res.status(502).json({ error: e.message, code: 'AI_ERROR' });
+    if (e instanceof AIError) return res.status(502).json({ error: e.message, code: e.code || 'AI_ERROR' });
     return res.status(500).json({ error: 'Não foi possível gerar o treino: ' + e.message });
   }
 });
@@ -169,7 +169,7 @@ router.post('/:id/substitute', requireAuth, rateLimit({ windowMs: 60000, max: 12
       message: `${ex.name} substituído com sucesso.`,
     });
   } catch (e) {
-    if (e instanceof AIError) return res.status(502).json({ error: e.message, code: 'AI_ERROR' });
+    if (e instanceof AIError) return res.status(502).json({ error: e.message, code: e.code || 'AI_ERROR' });
     return res.status(500).json({ error: 'Falha ao substituir exercício: ' + e.message });
   }
 });
@@ -216,7 +216,7 @@ router.post('/:id/progress', requireAuth, rateLimit({ windowMs: 60000, max: 6 })
     await db.prepare('UPDATE workouts SET plan_json = ? WHERE id = ?').run(JSON.stringify(workout.plan_json), row.id);
     res.json({ analysis, message: 'Análise de progressão gerada.' });
   } catch (e) {
-    if (e instanceof AIError) return res.status(502).json({ error: e.message, code: 'AI_ERROR' });
+    if (e instanceof AIError) return res.status(502).json({ error: e.message, code: e.code || 'AI_ERROR' });
     return res.status(500).json({ error: 'Falha na análise: ' + e.message });
   }
 });
